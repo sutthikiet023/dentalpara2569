@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CQI: ระบบตรวจสอบยาพาราทันตกรรม</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Recharts -->
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700;800&display=swap');
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useMemo, useEffect } = React;
+        const { 
+            ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, 
+            CartesianGrid, Tooltip, Legend 
+        } = Recharts;
+
+        // Mock Lucide Icons for React (Simple Wrapper)
+        const Icon = ({ name, className, size = 20 }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, []);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        const App = () => {
+            // ข้อมูลจริงจากฝ่ายทันตกรรม
+            const rawData = [
+                { date: '01/12', size: '325', hosxp: 3, bot: 3, manual: 3 },
+                { date: '01/12', size: '500', hosxp: 1, bot: 1, manual: 1 },
+                { date: '02/12', size: '325', hosxp: 2, bot: 2, manual: 2 },
+                { date: '02/12', size: '500', hosxp: 1, bot: 1, manual: 1 },
+                { date: '03/12', size: '325', hosxp: 5, bot: 5, manual: 5 },
+                { date: '03/12', size: '500', hosxp: 6, bot: 6, manual: 6 },
+                { date: '04/12', size: '325', hosxp: 3, bot: 3, manual: 2, type: 'Input Error', note: 'HOSxP บันทึกผิด (จริงจ่าย 2)' },
+                { date: '04/12', size: '500', hosxp: 4, bot: 4, manual: 5, type: 'Input Error', note: 'HOSxP บันทึกผิด (จริงจ่าย 5)' },
+                { date: '08/12', size: '325', hosxp: 2, bot: 2, manual: 2 },
+                { date: '08/12', size: '500', hosxp: 9, bot: 9, manual: 9 },
+                { date: '09/12', size: '325', hosxp: 3, bot: 3, manual: 3 },
+                { date: '09/12', size: '500', hosxp: 7, bot: 7, manual: 7 },
+                { date: '11/12', size: '325', hosxp: 1, bot: 1, manual: 1 },
+                { date: '11/12', size: '500', hosxp: 4, bot: 4, manual: 4 },
+                { date: '12/12', size: '325', hosxp: 1, bot: 1, manual: 1 },
+                { date: '12/12', size: '500', hosxp: 4, bot: 4, manual: 4 },
+                { date: '15/12', size: '325', hosxp: 6, bot: 6, manual: 6 },
+                { date: '15/12', size: '500', hosxp: 5, bot: 5, manual: 5 },
+                { date: '16/12', size: '325', hosxp: 0, bot: 0, manual: 0 },
+                { date: '16/12', size: '500', hosxp: 2, bot: 2, manual: 2 },
+                { date: '17/12', size: '325', hosxp: 2, bot: 2, manual: 2 },
+                { date: '17/12', size: '500', hosxp: 2, bot: 3, manual: 2, type: 'Sync Error', note: 'Bot แจ้งยอดคลาดเคลื่อนจาก HOSxP' },
+                { date: '18/12', size: '325', hosxp: 2, bot: 2, manual: 2 },
+                { date: '18/12', size: '500', hosxp: 3, bot: 3, manual: 3 },
+                { date: '19/12', size: '325', hosxp: 6, bot: 6, manual: 6 },
+                { date: '19/12', size: '500', hosxp: 3, bot: 3, manual: 3 },
+                { date: '22/12', size: '325', hosxp: 4, bot: 4, manual: 4 },
+                { date: '22/12', size: '500', hosxp: 7, bot: 7, manual: 7 },
+                { date: '23/12', size: '325', hosxp: 4, bot: 4, manual: 4 },
+                { date: '23/12', size: '500', hosxp: 4, bot: 4, manual: 4 },
+            ];
+
+            const stats = useMemo(() => {
+                const total = rawData.length;
+                const botMatches = rawData.filter(d => d.bot === d.hosxp).length;
+                const botReliability = ((botMatches / total) * 100).toFixed(1);
+                const integrityMatches = rawData.filter(d => d.manual === d.hosxp).length;
+                const dataIntegrity = ((integrityMatches / total) * 100).toFixed(1);
+                const totalDiscrepancies = rawData.filter(d => d.bot !== d.hosxp || d.manual !== d.hosxp).length;
+                const inputErrors = rawData.filter(d => d.type === 'Input Error').length;
+                const syncErrors = rawData.filter(d => d.type === 'Sync Error').length;
+
+                return { total, botReliability, dataIntegrity, totalDiscrepancies, inputErrors, syncErrors };
+            }, [rawData]);
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-7xl mx-auto space-y-6">
+                        
+                        {/* Header */}
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="space-y-1">
+                                <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                                    <Icon name="shield-check" className="text-emerald-600" size={32} />
+                                    CQI: ระบบตรวจสอบและรายงานยาพาราทันตกรรม (Integrated Audit)
+                                </h1>
+                                <p className="text-slate-500 font-medium tracking-tight">การใช้ระบบแจ้งเตือนอัตโนมัติเป็นเครื่องมือตรวจสอบความถูกต้องของเวชระเบียน</p>
+                            </div>
+                            <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-2xl font-bold border border-indigo-100 flex items-center gap-2 whitespace-nowrap">
+                                <Icon name="database" size={18} />
+                                Data Audit Status: Active
+                            </div>
+                        </div>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <StatCard 
+                                label="รายการที่ตรวจสอบทั้งหมด" 
+                                value={stats.total} 
+                                unit="รายการ" 
+                                icon={<Icon name="file-text" className="text-slate-400" />} 
+                            />
+                            <StatCard 
+                                label="ความแม่นยำโปรแกรม Bot" 
+                                value={stats.botReliability + "%"} 
+                                unit="Reliability" 
+                                icon={<Icon name="zap" className="text-amber-500" />} 
+                                description="เทียบ Bot กับ HOSxP"
+                            />
+                            <StatCard 
+                                label="คุณภาพการบันทึกข้อมูล" 
+                                value={stats.dataIntegrity + "%"} 
+                                unit="Integrity" 
+                                icon={<Icon name="check-circle-2" className="text-emerald-500" />} 
+                                description="เทียบ HOSxP กับ จ่ายจริง"
+                            />
+                            <StatCard 
+                                label="ความคลาดเคลื่อนที่ตรวจพบ" 
+                                value={stats.totalDiscrepancies} 
+                                unit="ครั้ง" 
+                                icon={<Icon name="alert-circle" className="text-rose-500" />} 
+                                isWarning
+                                description={`บันทึกผิด ${stats.inputErrors} | ระบบผิด ${stats.syncErrors}`}
+                            />
+                        </div>
+
+                        {/* Charts Section */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                                <h2 className="font-bold text-slate-700 mb-6 flex items-center gap-2">
+                                    <Icon name="trending-up" size={20} className="text-indigo-600" />
+                                    เปรียบเทียบข้อมูล 3 มิติ (Audit View)
+                                </h2>
+                                <div className="h-[400px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={rawData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis dataKey="date" tick={{fontSize: 10}} interval={1} axisLine={false} tickLine={false} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                                            <Tooltip 
+                                                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                                            />
+                                            <Legend iconType="circle" />
+                                            <Bar name="HOSxP (Record)" dataKey="hosxp" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
+                                            <Bar name="Bot (Messenger)" dataKey="bot" fill="#fbbf24" radius={[4, 4, 0, 0]} barSize={20} />
+                                            <Line name="Reality (จ่ายจริง)" type="monotone" dataKey="manual" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-6">
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex-1">
+                                    <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-base">
+                                        <Icon name="search-check" className="text-indigo-600" size={18} />
+                                        สรุปการวิเคราะห์เชิงลึก
+                                    </h2>
+                                    <div className="space-y-4">
+                                        <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                                            <span className="text-[10px] font-black text-rose-700 uppercase tracking-wider block mb-1">Input Error (ความผิดพลาดของคน)</span>
+                                            <p className="text-xs text-rose-900 leading-relaxed font-medium">
+                                                ตรวจพบการบันทึกใน HOSxP ผิดขนาดในวันที่ 4/12 ซึ่งการจ่ายจริงตรงตามความเหมาะสม แต่ข้อมูลในระบบไม่ถูกต้อง
+                                            </p>
+                                        </div>
+
+                                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                                            <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block mb-1">Sync Error (ความผิดพลาดของระบบ)</span>
+                                            <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                                                พบจุดคลาดเคลื่อนของ Bot ในวันที่ 17/12 ซึ่งยอดแจ้งเตือนไม่ตรงกับ HOSxP (Sync Lag)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-xl">
+                                    <h3 className="font-bold mb-2 flex items-center gap-2 text-sm">
+                                        <Icon name="layout-dashboard" size={16} /> ผลกระทบของโครงการ
+                                    </h3>
+                                    <p className="text-slate-400 text-[11px] leading-relaxed italic font-medium">
+                                        การนับยอดด้วยมือหน้างานช่วยให้เราพบ "ความจริง" ของการจ่ายยา ซึ่งนำมาใช้ในการ Audit ข้อมูลในระบบ HOSxP ให้ถูกต้องแม่นยำขึ้นผ่านการแจ้งเตือนของ Bot
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detailed Table */}
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                <h3 className="font-bold text-slate-700 text-sm">รายละเอียดการตรวจสอบรายวัน (Integrated Audit Log)</h3>
+                                <div className="flex gap-2">
+                                    <span className="flex items-center gap-1 text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded-lg">● มีจุดคลาดเคลื่อน</span>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-50 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                            <th className="px-6 py-4">วันที่</th>
+                                            <th className="px-6 py-4 text-center">ขนาด</th>
+                                            <th className="px-6 py-4 text-center">HOSxP (บันทึก)</th>
+                                            <th className="px-6 py-4 text-center">Bot (แจ้งเตือน)</th>
+                                            <th className="px-6 py-4 text-center">Manual (จ่ายจริง)</th>
+                                            <th className="px-6 py-4">สถานะการตรวจสอบ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {rawData.map((item, idx) => {
+                                            const isBotMatch = item.bot === item.hosxp;
+                                            const isActualMatch = item.manual === item.hosxp;
+                                            const hasAnyError = !isBotMatch || !isActualMatch;
+                                            
+                                            return (
+                                                <tr key={idx} className={`hover:bg-slate-50 transition-colors ${hasAnyError ? 'bg-rose-50/40' : ''}`}>
+                                                    <td className="px-6 py-4 font-bold text-slate-700">{item.date}</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${item.size === '325' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                            {item.size}mg
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-black text-slate-900">{item.hosxp}</td>
+                                                    <td className={`px-6 py-4 text-center ${!isBotMatch ? 'text-rose-600 font-black' : 'text-slate-400'}`}>{item.bot}</td>
+                                                    <td className={`px-6 py-4 text-center ${!isActualMatch ? 'text-rose-600 font-black underline' : 'text-slate-400'}`}>{item.manual}</td>
+                                                    <td className="px-6 py-4">
+                                                        {hasAnyError ? (
+                                                            <div className="flex flex-col">
+                                                                <span className="text-rose-600 text-[11px] font-black flex items-center gap-1">
+                                                                    <Icon name="alert-circle" size={14} /> {item.type || 'พบจุดคลาดเคลื่อน'}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-500 italic font-medium">{item.note}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-emerald-600 text-[11px] font-bold flex items-center gap-1">
+                                                                <Icon name="check-circle-2" size={14} /> ข้อมูลถูกต้องตรงกัน
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const StatCard = ({ label, value, unit, icon, description, isWarning }) => (
+            <div className={`p-6 bg-white rounded-3xl shadow-sm border ${isWarning ? 'border-rose-100 bg-rose-50/20' : 'border-slate-200'}`}>
+                <div className="flex justify-between items-start mb-4">
+                    <div className={`p-2 rounded-2xl ${isWarning ? 'bg-rose-100' : 'bg-slate-50'}`}>{icon}</div>
+                    {isWarning && <span className="animate-pulse text-[10px] bg-rose-600 text-white px-2 py-1 rounded-full font-black">DETECTED</span>}
+                </div>
+                <div className="space-y-1">
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-wider">{label}</p>
+                    <div className="flex items-baseline gap-2">
+                        <h3 className={`text-3xl font-black ${isWarning ? 'text-rose-600' : 'text-slate-800'}`}>{value}</h3>
+                        <span className="text-slate-400 text-xs font-bold uppercase">{unit}</span>
+                    </div>
+                    {description && <p className="text-[10px] text-slate-400 font-medium leading-tight mt-1">{description}</p>}
+                </div>
+            </div>
+        );
+
+        // Render App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
